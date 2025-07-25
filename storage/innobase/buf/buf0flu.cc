@@ -31,11 +31,16 @@ this program; if not, write to the Free Software Foundation, Inc.,
  Created 11/11/1995 Heikki Tuuri
  *******************************************************/
 
+#include <fcntl.h>
+#include <linux/fiemap.h>
+#include <linux/fs.h>
 #include <math.h>
 #include <my_dbug.h>
 #include <mysql/service_thd_wait.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 
 #ifndef UNIV_HOTBACKUP
 #include "buf0buf.h"
@@ -506,6 +511,44 @@ void buf_flush_insert_into_flush_list(
     buf_block_t *block,   /*!< in/out: block which is modified */
     lsn_t lsn)            /*!< in: oldest modification */
 {
+  if (block != nullptr && buf_page_in_file(&block->page)) {
+    fil_space_t *space = fil_space_get(block->page.id.space());
+    if (space != nullptr) {
+      const char *path = space->name;
+      int fd = open(path, O_RDONLY);
+      if (fd >= 0) {
+        const ulint page_size_phys = block->page.size.physical();
+        const off_t offset = (off_t)block->page.id.page_no() * page_size_phys;
+
+        struct fiemap *fiemap = (struct fiemap *)calloc(
+            1, sizeof(struct fiemap) + sizeof(struct fiemap_extent));
+        if (fiemap != nullptr) {
+          fiemap->fm_start = offset;
+          fiemap->fm_length = page_size_phys;
+          fiemap->fm_flags = FIEMAP_FLAG_SYNC;
+          fiemap->fm_extent_count = 1;
+
+          if (ioctl(fd, FS_IOC_FIEMAP, fiemap) == 0) {
+            if (fiemap->fm_mapped_extents > 0) {
+              uint64_t p_offset = fiemap->fm_extents[0].fe_physical;
+              uint64_t p_len = fiemap->fm_extents[0].fe_length;
+              fprintf(stderr,
+                      "InnoDB FIEMAP DIRTY: page=(%u, %u) path='%s' "
+                      "logical_offset=%lu "
+                      "physical_offset=%lu physical_len=%lu start_sector=%lu "
+                      "sector_count=%lu\n",
+                      block->page.id.space(), block->page.id.page_no(), path,
+                      (unsigned long)offset, (unsigned long)p_offset,
+                      (unsigned long)p_len, (unsigned long)(p_offset / 512),
+                      (unsigned long)(p_len / 512));
+            }
+          }
+          free(fiemap);
+        }
+        close(fd);
+      }
+    }
+  }
   ut_ad(mutex_own(buf_page_get_mutex(&block->page)));
   ut_ad(log_sys != nullptr);
 
@@ -778,6 +821,44 @@ bool buf_flush_ready_for_flush(buf_page_t *bpage, buf_flush_t flush_type) {
 /** Remove a block from the flush list of modified blocks.
 @param[in]      bpage   pointer to the block in question */
 void buf_flush_remove(buf_page_t *bpage) {
+  if (bpage != nullptr && buf_page_in_file(bpage)) {
+    fil_space_t *space = fil_space_get(bpage->id.space());
+    if (space != nullptr) {
+      const char *path = space->name;
+      int fd = open(path, O_RDONLY);
+      if (fd >= 0) {
+        const ulint page_size_phys = bpage->size.physical();
+        const off_t offset = (off_t)bpage->id.page_no() * page_size_phys;
+
+        struct fiemap *fiemap = (struct fiemap *)calloc(
+            1, sizeof(struct fiemap) + sizeof(struct fiemap_extent));
+        if (fiemap != nullptr) {
+          fiemap->fm_start = offset;
+          fiemap->fm_length = page_size_phys;
+          fiemap->fm_flags = FIEMAP_FLAG_SYNC;
+          fiemap->fm_extent_count = 1;
+
+          if (ioctl(fd, FS_IOC_FIEMAP, fiemap) == 0) {
+            if (fiemap->fm_mapped_extents > 0) {
+              uint64_t p_offset = fiemap->fm_extents[0].fe_physical;
+              uint64_t p_len = fiemap->fm_extents[0].fe_length;
+              fprintf(stderr,
+                      "InnoDB FIEMAP CLEAN: page=(%u, %u) path='%s' "
+                      "logical_offset=%lu "
+                      "physical_offset=%lu physical_len=%lu start_sector=%lu "
+                      "sector_count=%lu\n",
+                      bpage->id.space(), bpage->id.page_no(), path,
+                      (unsigned long)offset, (unsigned long)p_offset,
+                      (unsigned long)p_len, (unsigned long)(p_offset / 512),
+                      (unsigned long)(p_len / 512));
+            }
+          }
+          free(fiemap);
+        }
+        close(fd);
+      }
+    }
+  }
   buf_pool_t *buf_pool = buf_pool_from_bpage(bpage);
 
   ut_ad(mutex_own(buf_page_get_mutex(bpage)));
