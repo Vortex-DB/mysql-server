@@ -33,10 +33,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "buf0lru.h"
 
-#include <fcntl.h>
-#include <linux/fiemap.h>
-#include <linux/fs.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 
 #include "btr0btr.h"
@@ -45,6 +41,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "buf0buf.h"
 #include "buf0dblwr.h"
 #include "buf0flu.h"
+#include "buf0nvme_hint.h"
 #include "buf0rea.h"
 #include "buf0stats.h"
 #include "fil0fil.h"
@@ -1563,30 +1560,8 @@ static inline void buf_LRU_remove_block(buf_page_t *bpage) {
         const ulint page_size_phys = bpage->size.physical();
         const off_t offset = (off_t)bpage->id.page_no() * page_size_phys;
 
-        struct fiemap *fiemap = (struct fiemap *)calloc(
-            1, sizeof(struct fiemap) + sizeof(struct fiemap_extent));
-        if (fiemap != nullptr) {
-          fiemap->fm_start = offset;
-          fiemap->fm_length = page_size_phys;
-          fiemap->fm_extent_count = 1;
+        nvme_send_buffer_evicted(fd, offset, page_size_phys);
 
-          if (ioctl(fd, FS_IOC_FIEMAP, fiemap) == 0) {
-            if (fiemap->fm_mapped_extents > 0) {
-              uint64_t p_offset = fiemap->fm_extents[0].fe_physical;
-              uint64_t p_len = fiemap->fm_extents[0].fe_length;
-              fprintf(stderr,
-                      "InnoDB FIEMAP REMOVE: page=(%u, %u) path='%s' "
-                      "logical_offset=%lu "
-                      "physical_offset=%lu physical_len=%lu start_sector=%lu "
-                      "sector_count=%lu\n",
-                      bpage->id.space(), bpage->id.page_no(), path,
-                      (unsigned long)offset, (unsigned long)p_offset,
-                      (unsigned long)p_len, (unsigned long)(p_offset / 512),
-                      (unsigned long)(p_len / 512));
-            }
-          }
-          free(fiemap);
-        }
         close(fd);
       }
     }
@@ -1760,31 +1735,7 @@ void buf_LRU_add_block(buf_page_t *bpage, /*!< in: control block */
       if (fd >= 0) {
         const ulint page_size_phys = bpage->size.physical();
         const off_t offset = (off_t)bpage->id.page_no() * page_size_phys;
-
-        struct fiemap *fiemap = (struct fiemap *)calloc(
-            1, sizeof(struct fiemap) + sizeof(struct fiemap_extent));
-        if (fiemap != nullptr) {
-          fiemap->fm_start = offset;
-          fiemap->fm_length = page_size_phys;
-          fiemap->fm_extent_count = 1;
-
-          if (ioctl(fd, FS_IOC_FIEMAP, fiemap) == 0) {
-            if (fiemap->fm_mapped_extents > 0) {
-              uint64_t p_offset = fiemap->fm_extents[0].fe_physical;
-              uint64_t p_len = fiemap->fm_extents[0].fe_length;
-              fprintf(
-                  stderr,
-                  "InnoDB FIEMAP: page=(%u, %u) path='%s' logical_offset=%lu "
-                  "physical_offset=%lu physical_len=%lu start_sector=%lu "
-                  "sector_count=%lu\n",
-                  bpage->id.space(), bpage->id.page_no(), path,
-                  (unsigned long)offset, (unsigned long)p_offset,
-                  (unsigned long)p_len, (unsigned long)(p_offset / 512),
-                  (unsigned long)(p_len / 512));
-            }
-          }
-          free(fiemap);
-        }
+        nvme_send_buffer_clean(fd, offset, page_size_phys);
         close(fd);
       }
     }

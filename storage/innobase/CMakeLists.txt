@@ -95,6 +95,7 @@ SET(INNOBASE_SOURCES
   buf/buf0dblwr.cc
   buf/buf0dump.cc
   buf/buf0flu.cc
+  buf/buf0nvme_hint.cc
   btr/btr0load.cc
   btr/btr0mtib.cc
   buf/buf0lru.cc
