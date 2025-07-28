@@ -1,1 +1,1 @@
-./opt/bin/mysqladmin -uroot -proot shutdown
+/usr/local/mysql/bin/mysqladmin -uroot -proot shutdown
