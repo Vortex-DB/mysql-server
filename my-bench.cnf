@@ -48,6 +48,7 @@ innodb_page_size=4KB
 #
 
 #file per table ON
+innodb_use_nvme_hint=true
 innodb_file_per_table=1
 
 #buffer settings

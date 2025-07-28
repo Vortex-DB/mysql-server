@@ -28,7 +28,7 @@ default-storage-engine = innodb
 pid-file        = /home/wurikiji/backup/db/mysql.pid
 socket          = /tmp/mysql.sock
 datadir         = /home/wurikiji/backup/db
-log-error	= /home/wurikiji/work/logs/mysqld_errors.log
+log-error	= /home/wurikiji/logs/mysqld_errors.log
 disable_log_bin
 character_set_server=latin1
 collation_server=latin1_bin
@@ -46,10 +46,11 @@ innodb_page_size=4KB
 #
 
 #file per table ON
+innodb_use_nvme_hint=false
 innodb_file_per_table=1
 
 #buffer settings
-innodb_buffer_pool_size=1G
+innodb_buffer_pool_size=10G
 innodb_buffer_pool_instances=8
 innodb_max_dirty_pages_pct_lwm=0
 
@@ -58,16 +59,16 @@ log_error_verbosity=3
 innodb_page_cleaners=8
 
 #transaction log settings
-innodb_log_file_size=1G
+innodb_log_file_size=2G
 innodb_log_files_in_group=3
 
 # 0:every 1 seconds, 1:fsync on commits, 2:writes on commits
 innodb_flush_log_at_trx_commit=0
-innodb_log_buffer_size=32M
+innodb_log_buffer_size=64M
 innodb_flush_neighbors=0
 
 #doublewrite and flush method
-innodb_doublewrite=ON
+innodb_doublewrite=OFF
 innodb_flush_method=O_DIRECT
 
 #AIO control
