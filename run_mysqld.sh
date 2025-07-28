@@ -4,5 +4,5 @@ then
   exit 1
 fi
 
-sudo /usr/local/mysql/bin/mysqld_safe --defaults-file=$1 &> ~/logs/mysqld_safe.log &
+sudo /usr/local/mysql/bin/mysqld_safe --defaults-file=$1 --user=root &> ~/logs/mysqld_safe.log &
 
