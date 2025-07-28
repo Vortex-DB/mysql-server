@@ -25,6 +25,14 @@
 
 INCLUDE(innodb.cmake)
 
+find_library(NVME_LIBRARY NAMES nvme)
+if(NVME_LIBRARY)
+  message(STATUS "Found libnvme: ${NVME_LIBRARY}, enabling NVMe hint feature.")
+  add_definitions(-DHAVE_LIBNVME)
+else()
+  message(WARNING "libnvme not found, disabling NVMe hint feature.")
+endif()
+
 MSVC_CPPCHECK_DISABLE()
 IF(NOT WITH_DEBUG)
   # the innodb parts are documented assuming WITH_DEBUG (UNIV_DEBUG)
@@ -95,7 +103,6 @@ SET(INNOBASE_SOURCES
   buf/buf0dblwr.cc
   buf/buf0dump.cc
   buf/buf0flu.cc
-  buf/buf0nvme_hint.cc
   btr/btr0load.cc
   btr/btr0mtib.cc
   buf/buf0lru.cc
@@ -267,6 +274,10 @@ SET(INNOBASE_SOURCES
   ut/ut0vec.cc
   ut/ut0wqueue.cc)
 
+if(NVME_LIBRARY)
+  list(APPEND INNOBASE_SOURCES buf/buf0nvme_hint.cc)
+endif()
+
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98753
 IF(MY_COMPILER_IS_GNU AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 11)
   ADD_COMPILE_FLAGS(
@@ -351,7 +362,7 @@ MYSQL_ADD_PLUGIN(innobase
   ${INNOBASE_SOURCES} ${INNOBASE_ZIP_DECOMPRESS_SOURCES} STORAGE_ENGINE
   MANDATORY
   MODULE_OUTPUT_NAME ha_innodb
-  LINK_LIBRARIES sql_dd sql_gis ext::zlib ext::lz4 ${NUMA_LIBRARY}
+  LINK_LIBRARIES sql_dd sql_gis ext::zlib ext::lz4 ${NUMA_LIBRARY} ${NVME_LIBRARY}
                  extra::rapidjson)
 
 # On linux: /usr/include/stdio.h:#define BUFSIZ 8192
