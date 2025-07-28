@@ -203,6 +203,9 @@ bool srv_read_only_mode;
 dictionary tables are in the system tablespace 0 */
 bool srv_file_per_table;
 
+/** Use NVMe hint */
+bool srv_use_nvme_hint;
+
 /** Sort buffer size in index creation */
 ulong srv_sort_buf_size = 1048576;
 /** Maximum modification log file size for online index creation */

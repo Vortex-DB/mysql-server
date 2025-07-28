@@ -375,6 +375,9 @@ extern bool high_level_read_only;
 /** store to its own file each table created by an user; data
 dictionary tables are in the system tablespace 0 */
 extern bool srv_file_per_table;
+
+/** Use NVMe hint */
+extern bool srv_use_nvme_hint;
 /** Sleep delay for threads waiting to enter InnoDB. In micro-seconds. */
 extern ulong srv_thread_sleep_delay;
 /** Maximum sleep delay (in micro-seconds), value of 0 disables it.*/

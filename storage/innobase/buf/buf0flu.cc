@@ -508,20 +508,7 @@ void buf_flush_insert_into_flush_list(
     buf_block_t *block,   /*!< in/out: block which is modified */
     lsn_t lsn)            /*!< in: oldest modification */
 {
-  if (block != nullptr && buf_page_in_file(&block->page)) {
-    fil_space_t *space = fil_space_get(block->page.id.space());
-    if (space != nullptr) {
-      const char *path = space->name;
-      int fd = open(path, O_RDONLY);
-      if (fd >= 0) {
-        const ulint page_size_phys = block->page.size.physical();
-        const off_t offset = (off_t)block->page.id.page_no() * page_size_phys;
-
-        nvme_send_buffer_dirty(fd, offset, page_size_phys);
-        close(fd);
-      }
-    }
-  }
+  nvme_send_buffer_dirty(&block->page);
   ut_ad(mutex_own(buf_page_get_mutex(&block->page)));
   ut_ad(log_sys != nullptr);
 
@@ -794,21 +781,7 @@ bool buf_flush_ready_for_flush(buf_page_t *bpage, buf_flush_t flush_type) {
 /** Remove a block from the flush list of modified blocks.
 @param[in]      bpage   pointer to the block in question */
 void buf_flush_remove(buf_page_t *bpage) {
-  if (bpage != nullptr && buf_page_in_file(bpage)) {
-    fil_space_t *space = fil_space_get(bpage->id.space());
-    if (space != nullptr) {
-      const char *path = space->name;
-      int fd = open(path, O_RDONLY);
-      if (fd >= 0) {
-        const ulint page_size_phys = bpage->size.physical();
-        const off_t offset = (off_t)bpage->id.page_no() * page_size_phys;
-
-        nvme_send_buffer_clean(fd, offset, page_size_phys);
-
-        close(fd);
-      }
-    }
-  }
+  nvme_send_buffer_clean(bpage);
   buf_pool_t *buf_pool = buf_pool_from_bpage(bpage);
 
   ut_ad(mutex_own(buf_page_get_mutex(bpage)));

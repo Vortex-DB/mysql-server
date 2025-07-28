@@ -47,8 +47,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "my_config.h"
 #endif /* !UNIV_HOTBACKUP */
 
-#include <cstdint>
-
 #include <auto_thd.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -58,6 +56,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <math.h>
 #include <my_compare.h>
 #include <mysqld.h>
+#include <sql_table.h>
 #include <stdlib.h>
 #include <strfunc.h>
 #include <time.h>
@@ -66,7 +65,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <cstdint>
 #include <memory>
 
-#include <sql_table.h>
 #include "mysql/components/services/system_variable_source.h"
 
 #ifndef UNIV_HOTBACKUP
@@ -83,6 +81,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <sql_show.h>
 #include <sql_tablespace.h>
 #include <sql_thd_internal_api.h>
+
 #include "api0api.h"
 #include "api0misc.h"
 #include "arch0arch.h"
@@ -199,23 +198,23 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ut0ut.h"
 #else
 #include <typelib.h>
+
 #include "buf0types.h"
 #include "univ.i"
 #endif /* !UNIV_HOTBACKUP */
 
-#include "log0files_io.h"
-
-#include "sql-common/json_binary.h"
-#include "sql-common/json_dom.h"
-
-#include "os0enc.h"
-#include "os0file.h"
-
 #include <scope_guard.h>
+
 #include <mutex>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "log0files_io.h"
+#include "os0enc.h"
+#include "os0file.h"
+#include "sql-common/json_binary.h"
+#include "sql-common/json_dom.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -636,16 +635,16 @@ const struct _ft_vft_ext ft_vft_ext_result = {
 
 #ifdef HAVE_PSI_INTERFACE
 #define PSI_KEY(n, flag, volatility, doc) \
-  { &(n##_key.m_value), #n, flag, volatility, doc }
+  {&(n##_key.m_value), #n, flag, volatility, doc}
 #define PSI_MEMORY_KEY(n, flag, volatility, doc) \
-  { &(n##_key), #n, flag, volatility, doc }
+  {&(n##_key), #n, flag, volatility, doc}
 #define PSI_MUTEX_KEY(n, flag, volatility, doc) \
-  { &(n##_key.m_value), #n, flag, volatility, doc }
+  {&(n##_key.m_value), #n, flag, volatility, doc}
 /* All RWLOCK used in Innodb are SX-locks */
 #define PSI_RWLOCK_KEY(n, volatility, doc) \
-  { &n##_key.m_value, #n, PSI_FLAG_RWLOCK_SX, volatility, doc }
+  {&n##_key.m_value, #n, PSI_FLAG_RWLOCK_SX, volatility, doc}
 #define PSI_THREAD_KEY(n, osn, flag, volatility, doc) \
-  { &(n##_key.m_value), #n, osn, flag, volatility, doc }
+  {&(n##_key.m_value), #n, osn, flag, volatility, doc}
 
 /* Keys to register pthread mutexes/cond in the current file with
 performance schema */
@@ -3518,8 +3517,7 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
       It should be able to reuse the deleted smaller ones later */
       auto current_max = m_space_max_id.load();
       while (current_max < space_id &&
-             !m_space_max_id.compare_exchange_weak(current_max, space_id))
-        ;
+             !m_space_max_id.compare_exchange_weak(current_max, space_id));
     }
 
     /* System and temp files are tracked and opened separately.
@@ -22316,10 +22314,16 @@ static MYSQL_SYSVAR_ULONG(
     " values are 0, 1 (faster) or 2 (fastest - crash-like).",
     nullptr, nullptr, 1, 0, 2, 0);
 
-static MYSQL_SYSVAR_BOOL(
-    file_per_table, srv_file_per_table, PLUGIN_VAR_NOCMDARG,
-    "Stores each InnoDB table to an .ibd file in the database dir.", nullptr,
-    nullptr, true);
+static MYSQL_SYSVAR_BOOL(file_per_table, srv_file_per_table,
+                         PLUGIN_VAR_NOCMDARG,
+                         "Store each new table to its own .ibd file.",
+                         /* check_func */ nullptr, /* update_func */ nullptr,
+                         /* default */ true);
+
+static MYSQL_SYSVAR_BOOL(use_nvme_hint, srv_use_nvme_hint, PLUGIN_VAR_NOCMDARG,
+                         "Use NVMe hint.",
+                         /* check_func */ nullptr, /* update_func */ nullptr,
+                         /* default */ false);
 
 static MYSQL_SYSVAR_STR(ft_server_stopword_table,
                         innobase_server_stopword_table,
@@ -23467,6 +23471,7 @@ static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(read_io_threads),
     MYSQL_SYSVAR(write_io_threads),
     MYSQL_SYSVAR(file_per_table),
+    MYSQL_SYSVAR(use_nvme_hint),
     MYSQL_SYSVAR(flush_log_at_timeout),
     MYSQL_SYSVAR(flush_log_at_trx_commit),
     MYSQL_SYSVAR(flush_method),

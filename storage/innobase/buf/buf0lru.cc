@@ -1551,21 +1551,7 @@ void buf_LRU_adjust_hp(buf_pool_t *buf_pool, const buf_page_t *bpage) {
 /** Removes a block from the LRU list.
 @param[in]      bpage   control block */
 static inline void buf_LRU_remove_block(buf_page_t *bpage) {
-  if (bpage != nullptr && buf_page_in_file(bpage)) {
-    fil_space_t *space = fil_space_get(bpage->id.space());
-    if (space != nullptr) {
-      const char *path = space->name;
-      int fd = open(path, O_RDONLY);
-      if (fd >= 0) {
-        const ulint page_size_phys = bpage->size.physical();
-        const off_t offset = (off_t)bpage->id.page_no() * page_size_phys;
-
-        nvme_send_buffer_evicted(fd, offset, page_size_phys);
-
-        close(fd);
-      }
-    }
-  }
+  nvme_send_buffer_evicted(bpage);
   buf_pool_t *buf_pool = buf_pool_from_bpage(bpage);
 
   ut_ad(mutex_own(&buf_pool->LRU_list_mutex));
@@ -1727,19 +1713,7 @@ void buf_LRU_add_block(buf_page_t *bpage, /*!< in: control block */
                                    block is added to the start, regardless of
                                    this parameter */
 {
-  if (bpage != nullptr && buf_page_in_file(bpage)) {
-    fil_space_t *space = fil_space_get(bpage->id.space());
-    if (space != nullptr) {
-      const char *path = space->name;
-      int fd = open(path, O_RDONLY);
-      if (fd >= 0) {
-        const ulint page_size_phys = bpage->size.physical();
-        const off_t offset = (off_t)bpage->id.page_no() * page_size_phys;
-        nvme_send_buffer_clean(fd, offset, page_size_phys);
-        close(fd);
-      }
-    }
-  }
+  nvme_send_buffer_clean(bpage);
   buf_LRU_add_block_low(bpage, old);
 }
 
