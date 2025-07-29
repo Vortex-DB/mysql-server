@@ -1552,6 +1552,7 @@ void buf_LRU_adjust_hp(buf_pool_t *buf_pool, const buf_page_t *bpage) {
 @param[in]      bpage   control block */
 static inline void buf_LRU_remove_block(buf_page_t *bpage) {
   nvme_send_buffer_evicted(bpage);
+  nvme_clear_mapping(bpage);
   buf_pool_t *buf_pool = buf_pool_from_bpage(bpage);
 
   ut_ad(mutex_own(&buf_pool->LRU_list_mutex));
@@ -1713,6 +1714,7 @@ void buf_LRU_add_block(buf_page_t *bpage, /*!< in: control block */
                                    block is added to the start, regardless of
                                    this parameter */
 {
+  nvme_set_mapping(bpage);
   nvme_send_buffer_clean(bpage);
   buf_LRU_add_block_low(bpage, old);
 }

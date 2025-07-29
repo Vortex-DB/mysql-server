@@ -1,9 +1,28 @@
-
 #include "buf0nvme_hint.h"
+
+#include <mutex>
+#include <unordered_map>
 
 #include "buf0buf.h"
 #include "fil0fil.h"
 #include "srv0srv.h"
+
+std::mutex p2s_mutex;
+std::mutex s2p_mutex;
+std::unordered_map<buf_page_t *, uint64_t> page2sector;
+std::unordered_map<uint64_t, buf_page_t *> sector2page;
+
+void nvme_map_init() {
+  std::scoped_lock lock{p2s_mutex, s2p_mutex};
+  page2sector.clear();
+  sector2page.clear();
+}
+
+void nvme_map_free() {
+  std::scoped_lock lock{p2s_mutex, s2p_mutex};
+  page2sector.clear();
+  sector2page.clear();
+}
 
 struct fiemap *get_fiemap(int fd, uint64_t offset, uint64_t size) {
   struct fiemap *fiemap = (struct fiemap *)calloc(
@@ -23,7 +42,21 @@ struct fiemap *get_fiemap(int fd, uint64_t offset, uint64_t size) {
   return fiemap;
 }
 
-void nvme_send_host_hint(buf_page_t *bpage, uint32_t flag) {
+int64_t nvme_get_sector_number(buf_page_t *bpage) {
+  if (!page2sector.contains(bpage)) {
+    return -1LL;
+  }
+  return page2sector[bpage];
+}
+
+buf_page_t *nvme_get_bpage(uint64_t sector) {
+  if (!sector2page.contains(sector)) {
+    return nullptr;
+  }
+  return sector2page[sector];
+}
+
+void nvme_set_mapping(buf_page_t *bpage) {
   if (!srv_use_nvme_hint) {
     return;
   }
@@ -41,20 +74,54 @@ void nvme_send_host_hint(buf_page_t *bpage, uint32_t flag) {
   if (fd < 0) {
     return;
   }
-  int nvme_fd = open("/dev/nvme0n1", O_RDWR);
-  if (nvme_fd < 0) {
-    close(fd);
-    return;
-  }
 
   const ulint page_size_phys = bpage->size.physical();
   const off_t offset = (off_t)bpage->id.page_no() * page_size_phys;
 
   struct fiemap *map = get_fiemap(fd, offset, page_size_phys);
   if (map == NULL) {
-    close(nvme_fd);
     return;
   }
+
+  uint64_t p_offset = map->fm_extents[0].fe_physical;
+  uint64_t sector_size = 512;
+  uint64_t sector = p_offset / sector_size;
+  free(map);
+
+  std::scoped_lock lock(p2s_mutex, s2p_mutex);
+  sector2page[sector] = bpage;
+  page2sector[bpage] = sector;
+}
+
+void nvme_clear_mapping(buf_page_t *bpage) {
+  if (!srv_use_nvme_hint) {
+    return;
+  }
+  std::scoped_lock lock{p2s_mutex, s2p_mutex};
+  uint64_t sector = nvme_get_sector_number(bpage);
+  sector2page.erase(sector);
+  page2sector.erase(bpage);
+}
+
+void nvme_send_host_hint(buf_page_t *bpage, uint32_t flag) {
+  if (!srv_use_nvme_hint) {
+    return;
+  }
+  if (bpage == nullptr || !buf_page_in_file(bpage)) {
+    return;
+  }
+
+  int64_t sector = nvme_get_sector_number(bpage);
+  if (sector == -1) {
+    return;
+  }
+
+  int nvme_fd = open("/dev/nvme0n1", O_RDWR);
+  if (nvme_fd < 0) {
+    return;
+  }
+
+  const ulint page_size_phys = bpage->size.physical();
   struct nvme_dsm_range dsm_range;
   struct nvme_dsm_args args;
   const uint64_t sector_size = 512;
@@ -74,24 +141,19 @@ void nvme_send_host_hint(buf_page_t *bpage, uint32_t flag) {
   if (!args.result) {
     fprintf(stderr, "nvme_dsm failed allocating result buffer: %s\n",
             strerror(errno));
-    free(map);
     close(nvme_fd);
     return;
   }
 
-  for (i = 0; i < map->fm_mapped_extents; ++i) {
-    uint64_t p_offset = map->fm_extents[i].fe_physical;
-    uint64_t p_len = map->fm_extents[i].fe_length;
-    dsm_range.nlb = (p_len + sector_size - 1) / sector_size - 1;
-    dsm_range.slba = p_offset / sector_size;
-    int rc = nvme_dsm(&args);
-    if (rc < 0) {
-      fprintf(stderr, "nvme_dsm failed: %s\n", strerror(errno));
-    }
+  dsm_range.nlb = (page_size_phys + sector_size - 1) / sector_size - 1;
+  dsm_range.slba = sector;
+
+  int rc = nvme_dsm(&args);
+  if (rc < 0) {
+    fprintf(stderr, "nvme_dsm failed: %s\n", strerror(errno));
   }
 
   free(args.result);
-  free(map);
   close(nvme_fd);
 }
 
@@ -105,4 +167,11 @@ void nvme_send_buffer_dirty(buf_page_t *bpage) {
 
 void nvme_send_buffer_evicted(buf_page_t *bpage) {
   nvme_send_host_hint(bpage, DSM_HINT_EVICTED);
+}
+
+std::shared_ptr<NVMe_Reclaim_Info> nvme_get_next_reclaim_info() {
+  std::shared_ptr<NVMe_Reclaim_Info> info =
+      std::make_shared<NVMe_Reclaim_Info>();
+
+  return info;
 }

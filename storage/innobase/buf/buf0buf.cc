@@ -38,53 +38,53 @@ this program; if not, write to the Free Software Foundation, Inc.,
  Created 11/5/1995 Heikki Tuuri
  *******************************************************/
 
-#include "my_config.h"
+#include "buf0buf.h"
 
 #include "btr0btr.h"
-#include "buf0buf.h"
+#include "buf0nvme_hint.h"
 #include "fil0fil.h"
 #include "fsp0sysspace.h"
 #include "ha_prototypes.h"
 #include "mem0mem.h"
+#include "my_config.h"
 #include "my_dbug.h"
 #include "page0size.h"
 #ifndef UNIV_HOTBACKUP
-#include "btr0sea.h"
-#include "buf0buddy.h"
-#include "buf0stats.h"
-#include "dict0stats_bg.h"
-#include "ibuf0ibuf.h"
-#include "lock0lock.h"
-#include "log0buf.h"
-#include "log0chkp.h"
-#include "page0page.h"
-#include "sync0rw.h"
-#include "trx0purge.h"
-#include "trx0undo.h"
-
 #include <errno.h>
 #include <stdarg.h>
 #include <sys/types.h>
 #include <time.h>
+
 #include <map>
 #include <new>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
 
+#include "btr0sea.h"
+#include "buf0buddy.h"
 #include "buf0checksum.h"
 #include "buf0dump.h"
+#include "buf0stats.h"
 #include "dict0dict.h"
+#include "dict0stats_bg.h"
+#include "ibuf0ibuf.h"
+#include "lock0lock.h"
+#include "log0buf.h"
+#include "log0chkp.h"
 #include "log0recv.h"
 #include "os0thread-create.h"
+#include "page0page.h"
 #include "page0zip.h"
+#include "scope_guard.h"
 #include "srv0mon.h"
 #include "srv0srv.h"
 #include "srv0start.h"
+#include "sync0rw.h"
 #include "sync0sync.h"
+#include "trx0purge.h"
+#include "trx0undo.h"
 #include "ut0new.h"
-
-#include "scope_guard.h"
 
 #endif /* !UNIV_HOTBACKUP */
 
@@ -1482,7 +1482,9 @@ static void buf_pool_free_instance(buf_pool_t *buf_pool) {
 
 /** Frees the buffer pool global data structures. */
 static void buf_pool_free() {
+  nvme_map_free();
   btr_search_sys_free();
+
   ut::delete_(buf_stat_per_index);
 
   ut::delete_(buf_chunk_map_reg);
@@ -1505,6 +1507,8 @@ dberr_t buf_pool_init(ulint total_size, ulint n_instances) {
   ut_ad(n_instances == srv_buf_pool_instances);
 
   NUMA_MEMPOLICY_INTERLEAVE_IN_SCOPE;
+
+  nvme_map_init();
 
   /* Usually buf_pool_should_madvise is protected by buf_pool_t::chunk_mutex-es,
   but at this point in time there is no buf_pool_t instances yet, and no risk of
@@ -5936,8 +5940,8 @@ bool buf_page_io_complete(buf_page_t *bpage, bool evict, IORequest *type,
       }
     }
 
-    DBUG_EXECUTE_IF("buf_page_import_corrupt_failure", page_not_corrupt
-                    : bpage = bpage;);
+    DBUG_EXECUTE_IF("buf_page_import_corrupt_failure",
+                    page_not_corrupt : bpage = bpage;);
 
     if (recv_recovery_is_on()) {
       /* Pages must be uncompressed for crash recovery. */
