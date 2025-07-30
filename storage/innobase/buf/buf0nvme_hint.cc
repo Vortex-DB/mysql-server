@@ -6,6 +6,7 @@
 #include "buf0buf.h"
 #include "fil0fil.h"
 #include "srv0srv.h"
+#include "ut0log.h"
 
 std::mutex p2s_mutex;
 std::mutex s2p_mutex;
@@ -42,37 +43,25 @@ struct fiemap *get_fiemap(int fd, uint64_t offset, uint64_t size) {
   return fiemap;
 }
 
-int64_t nvme_get_sector_number(buf_page_t *bpage) {
-  if (!page2sector.contains(bpage)) {
-    return -1LL;
-  }
-  return page2sector[bpage];
-}
-
-buf_page_t *nvme_get_bpage(uint64_t sector) {
-  if (!sector2page.contains(sector)) {
-    return nullptr;
-  }
-  return sector2page[sector];
-}
-
-void nvme_set_mapping(buf_page_t *bpage) {
+int64_t nvme_set_mapping(buf_page_t *bpage) {
   if (!srv_use_nvme_hint) {
-    return;
+    return -1;
   }
   if (bpage == nullptr || !buf_page_in_file(bpage)) {
-    return;
+    return -1;
   }
-  fil_space_t *space = fil_space_get(bpage->id.space());
+  fil_space_t *space = bpage->get_space();
 
   if (space == nullptr) {
-    return;
+    return -1;
   }
 
-  const char *path = space->name;
+  auto page_no = bpage->page_no();
+  fil_node_t *fil_node = space->get_file_node(&page_no);
+  const char *path = fil_node->name;
   int fd = open(path, O_RDONLY);
   if (fd < 0) {
-    return;
+    return -1;
   }
 
   const ulint page_size_phys = bpage->size.physical();
@@ -80,7 +69,12 @@ void nvme_set_mapping(buf_page_t *bpage) {
 
   struct fiemap *map = get_fiemap(fd, offset, page_size_phys);
   if (map == NULL) {
-    return;
+    return -1;
+  }
+  close(fd);
+  if (map->fm_mapped_extents <= 0) {
+    free(map);
+    return -1;
   }
 
   uint64_t p_offset = map->fm_extents[0].fe_physical;
@@ -91,6 +85,20 @@ void nvme_set_mapping(buf_page_t *bpage) {
   std::scoped_lock lock(p2s_mutex, s2p_mutex);
   sector2page[sector] = bpage;
   page2sector[bpage] = sector;
+  return sector;
+}
+int64_t nvme_get_sector_number(buf_page_t *bpage) {
+  if (!page2sector.contains(bpage)) {
+    return nvme_set_mapping(bpage);
+  }
+  return page2sector[bpage];
+}
+
+buf_page_t *nvme_get_bpage(uint64_t sector) {
+  if (!sector2page.contains(sector)) {
+    return nullptr;
+  }
+  return sector2page[sector];
 }
 
 void nvme_clear_mapping(buf_page_t *bpage) {

@@ -1714,7 +1714,6 @@ void buf_LRU_add_block(buf_page_t *bpage, /*!< in: control block */
                                    block is added to the start, regardless of
                                    this parameter */
 {
-  nvme_set_mapping(bpage);
   nvme_send_buffer_clean(bpage);
   buf_LRU_add_block_low(bpage, old);
 }

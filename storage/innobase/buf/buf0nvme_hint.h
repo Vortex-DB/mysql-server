@@ -24,7 +24,7 @@ void nvme_map_free();
 
 void nvme_clear_mapping(buf_page_t *bpage);
 
-void nvme_set_mapping(buf_page_t *bpage);
+int64_t nvme_set_mapping(buf_page_t *bpage);
 
 int64_t nvme_get_sector_number(buf_page_t *bpage);
 
