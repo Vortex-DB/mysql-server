@@ -22325,6 +22325,10 @@ static MYSQL_SYSVAR_BOOL(use_nvme_hint, srv_use_nvme_hint, PLUGIN_VAR_NOCMDARG,
                          /* check_func */ nullptr, /* update_func */ nullptr,
                          /* default */ false);
 
+static MYSQL_SYSVAR_UINT(cpr_write_period, srv_cpr_write_period,
+                         PLUGIN_VAR_OPCMDARG, "Flush CPR write every N writes",
+                         nullptr, nullptr, 1, 0, 1048576, 0);
+
 static MYSQL_SYSVAR_STR(ft_server_stopword_table,
                         innobase_server_stopword_table,
                         PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_MEMALLOC,
@@ -23472,6 +23476,7 @@ static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(write_io_threads),
     MYSQL_SYSVAR(file_per_table),
     MYSQL_SYSVAR(use_nvme_hint),
+    MYSQL_SYSVAR(cpr_write_period),
     MYSQL_SYSVAR(flush_log_at_timeout),
     MYSQL_SYSVAR(flush_log_at_trx_commit),
     MYSQL_SYSVAR(flush_method),

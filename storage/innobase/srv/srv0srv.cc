@@ -73,6 +73,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "log0recv.h"
 #include "log0write.h"
 #include "mem0mem.h"
+#include "my_dbug.h"
+#include "my_psi_config.h"
 #include "os0proc.h"
 #include "os0thread-create.h"
 #include "pars0pars.h"
@@ -81,9 +83,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "sql/sql_class.h"
 #include "sql_thd_internal_api.h"
 #include "srv0mon.h"
-
-#include "my_dbug.h"
-#include "my_psi_config.h"
 
 #endif /* !UNIV_HOTBACKUP */
 #include "srv0srv.h"
@@ -205,6 +204,7 @@ bool srv_file_per_table;
 
 /** Use NVMe hint */
 bool srv_use_nvme_hint;
+uint32_t srv_cpr_write_period;
 
 /** Sort buffer size in index creation */
 ulong srv_sort_buf_size = 1048576;

@@ -55,6 +55,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "univ.i"
 
 #ifndef UNIV_HOTBACKUP
+#include <cstdint>
+#include <future>
+
 #include "log0ddl.h"
 #include "os0event.h"
 #include "os0file.h"
@@ -63,9 +66,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "srv0conc.h"
 #include "trx0types.h"
 #include "ut0counter.h"
-
-#include <cstdint>
-#include <future>
 
 /* Global counters used inside InnoDB. */
 struct srv_stats_t {
@@ -378,6 +378,7 @@ extern bool srv_file_per_table;
 
 /** Use NVMe hint */
 extern bool srv_use_nvme_hint;
+extern uint32_t srv_cpr_write_period;
 /** Sleep delay for threads waiting to enter InnoDB. In micro-seconds. */
 extern ulong srv_thread_sleep_delay;
 /** Maximum sleep delay (in micro-seconds), value of 0 disables it.*/
