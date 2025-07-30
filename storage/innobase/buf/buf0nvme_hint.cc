@@ -5,6 +5,7 @@
 
 #include "buf0buf.h"
 #include "fil0fil.h"
+#include "scope_guard.h"
 #include "srv0srv.h"
 #include "ut0log.h"
 
@@ -112,6 +113,12 @@ void nvme_send_host_hint(buf_page_t *bpage, uint32_t flag) {
     return;
   }
 
+  // buf_page_in_file() ensures this is a buf_block_t.
+  auto *block = reinterpret_cast<buf_block_t *>(bpage);
+
+  buf_block_buf_fix_inc(block, UT_LOCATION_HERE);
+  auto bpage_guard = create_scope_guard([&] { buf_block_buf_fix_dec(block); });
+
   int64_t sector = nvme_get_sector_number(bpage);
   if (sector == -1) {
     return;
@@ -174,6 +181,9 @@ void nvme_send_buffer_dirty(buf_page_t *bpage) {
 }
 
 void nvme_send_buffer_evicted(buf_page_t *bpage) {
+  if (!srv_use_nvme_hint) {
+    return;
+  }
   nvme_send_host_hint(bpage, DSM_HINT_EVICTED);
 }
 
