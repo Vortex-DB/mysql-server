@@ -44,6 +44,24 @@ struct fiemap *get_fiemap(int fd, uint64_t offset, uint64_t size) {
   return fiemap;
 }
 
+int64_t nvme_get_sector_number(buf_page_t *bpage) {
+  {
+    std::lock_guard lock(p2s_mutex);
+    if (page2sector.contains(bpage)) {
+      return page2sector[bpage];
+    }
+  }
+  return nvme_set_mapping(bpage);
+}
+
+buf_page_t *nvme_get_bpage(uint64_t sector) {
+  std::lock_guard lock(s2p_mutex);
+  if (!sector2page.contains(sector)) {
+    return nullptr;
+  }
+  return sector2page[sector];
+}
+
 int64_t nvme_set_mapping(buf_page_t *bpage) {
   if (bpage == nullptr || !buf_page_in_file(bpage)) {
     return -1;
@@ -85,25 +103,10 @@ int64_t nvme_set_mapping(buf_page_t *bpage) {
   page2sector[bpage] = sector;
   return sector;
 }
-int64_t nvme_get_sector_number(buf_page_t *bpage) {
-  std::lock_guard lock(p2s_mutex);
-  if (!page2sector.contains(bpage)) {
-    return nvme_set_mapping(bpage);
-  }
-  return page2sector[bpage];
-}
-
-buf_page_t *nvme_get_bpage(uint64_t sector) {
-  std::lock_guard lock(s2p_mutex);
-  if (!sector2page.contains(sector)) {
-    return nullptr;
-  }
-  return sector2page[sector];
-}
 
 void nvme_clear_mapping(buf_page_t *bpage) {
-  std::scoped_lock lock{p2s_mutex, s2p_mutex};
   uint64_t sector = nvme_get_sector_number(bpage);
+  std::scoped_lock lock{p2s_mutex, s2p_mutex};
   sector2page.erase(sector);
   page2sector.erase(bpage);
 }
@@ -112,12 +115,6 @@ void nvme_send_host_hint(buf_page_t *bpage, uint32_t flag) {
   if (bpage == nullptr || !buf_page_in_file(bpage)) {
     return;
   }
-
-  // buf_page_in_file() ensures this is a buf_block_t.
-  auto *block = reinterpret_cast<buf_block_t *>(bpage);
-
-  buf_block_buf_fix_inc(block, UT_LOCATION_HERE);
-  auto bpage_guard = create_scope_guard([&] { buf_block_buf_fix_dec(block); });
 
   int64_t sector = nvme_get_sector_number(bpage);
   if (sector == -1) {
@@ -181,9 +178,6 @@ void nvme_send_buffer_dirty(buf_page_t *bpage) {
 }
 
 void nvme_send_buffer_evicted(buf_page_t *bpage) {
-  if (!srv_use_nvme_hint) {
-    return;
-  }
   nvme_send_host_hint(bpage, DSM_HINT_EVICTED);
 }
 

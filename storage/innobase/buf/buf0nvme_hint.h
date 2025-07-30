@@ -41,7 +41,7 @@ struct NVMe_Reclaim_Info {
   uint32_t num_pages;
 
   // starting sectors
-  std::vector<uint64_t> sectors;
+  std::vector<uint32_t> sectors;
 };
 
 std::shared_ptr<NVMe_Reclaim_Info> nvme_get_next_reclaim_info();
