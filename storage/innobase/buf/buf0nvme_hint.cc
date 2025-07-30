@@ -44,9 +44,6 @@ struct fiemap *get_fiemap(int fd, uint64_t offset, uint64_t size) {
 }
 
 int64_t nvme_set_mapping(buf_page_t *bpage) {
-  if (!srv_use_nvme_hint) {
-    return -1;
-  }
   if (bpage == nullptr || !buf_page_in_file(bpage)) {
     return -1;
   }
@@ -88,6 +85,7 @@ int64_t nvme_set_mapping(buf_page_t *bpage) {
   return sector;
 }
 int64_t nvme_get_sector_number(buf_page_t *bpage) {
+  std::lock_guard lock(p2s_mutex);
   if (!page2sector.contains(bpage)) {
     return nvme_set_mapping(bpage);
   }
@@ -95,6 +93,7 @@ int64_t nvme_get_sector_number(buf_page_t *bpage) {
 }
 
 buf_page_t *nvme_get_bpage(uint64_t sector) {
+  std::lock_guard lock(s2p_mutex);
   if (!sector2page.contains(sector)) {
     return nullptr;
   }
@@ -102,9 +101,6 @@ buf_page_t *nvme_get_bpage(uint64_t sector) {
 }
 
 void nvme_clear_mapping(buf_page_t *bpage) {
-  if (!srv_use_nvme_hint) {
-    return;
-  }
   std::scoped_lock lock{p2s_mutex, s2p_mutex};
   uint64_t sector = nvme_get_sector_number(bpage);
   sector2page.erase(sector);
@@ -112,9 +108,6 @@ void nvme_clear_mapping(buf_page_t *bpage) {
 }
 
 void nvme_send_host_hint(buf_page_t *bpage, uint32_t flag) {
-  if (!srv_use_nvme_hint) {
-    return;
-  }
   if (bpage == nullptr || !buf_page_in_file(bpage)) {
     return;
   }
@@ -165,10 +158,18 @@ void nvme_send_host_hint(buf_page_t *bpage, uint32_t flag) {
 }
 
 void nvme_send_buffer_clean(buf_page_t *bpage) {
+  if (!srv_use_nvme_hint) {
+    nvme_send_buffer_evicted(bpage);
+    return;
+  }
   nvme_send_host_hint(bpage, DSM_HINT_CLEAN);
 }
 
 void nvme_send_buffer_dirty(buf_page_t *bpage) {
+  if (!srv_use_nvme_hint) {
+    nvme_send_buffer_evicted(bpage);
+    return;
+  }
   nvme_send_host_hint(bpage, DSM_HINT_DIRTY);
 }
 

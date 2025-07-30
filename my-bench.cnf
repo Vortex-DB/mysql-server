@@ -21,6 +21,7 @@ socket          = /tmp/mysql.sock
 #
 # * Basic Settings
 #
+
 user=root
 bind-address=*
 port            = 3306
@@ -48,7 +49,7 @@ innodb_page_size=4KB
 #
 
 #file per table ON
-innodb_use_nvme_hint=true
+innodb_use_nvme_hint=false
 innodb_file_per_table=1
 
 #buffer settings
@@ -93,4 +94,5 @@ innodb_io_capacity_max = 200000
 #performance-schema-instrument='wait/synch/rwlock/innodb/%=ON'
 #innodb_status_output = ON
 #innodb_status_output_locks = ON
+
 
