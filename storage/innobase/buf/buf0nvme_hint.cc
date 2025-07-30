@@ -125,7 +125,6 @@ void nvme_send_host_hint(buf_page_t *bpage, uint32_t flag) {
   struct nvme_dsm_range dsm_range;
   struct nvme_dsm_args args;
   const uint64_t sector_size = 512;
-  uint32_t i;
 
   memset(&args, 0, sizeof(args));
   memset(&dsm_range, 0, sizeof(dsm_range));

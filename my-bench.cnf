@@ -26,9 +26,9 @@ bind-address=*
 port            = 3306
 default-storage-engine = innodb
 #skip-grant-tables
-pid-file        = /home/wurikiji/ssd/db/mysql.pid
+pid-file        = /home/wurikiji/nvme/db/mysql.pid
 socket          = /tmp/mysql.sock
-datadir         = /home/wurikiji/ssd/db
+datadir         = /home/wurikiji/nvme/db
 log-error	= /home/wurikiji/logs/mysqld_errors.log
 disable_log_bin
 character_set_server=latin1
@@ -76,7 +76,7 @@ innodb_flush_method=O_DIRECT
 #AIO control
 innodb_use_native_aio=true
 innodb_change_buffering=none
-innodb_lru_scan_depth=16384
+innodb_lru_scan_depth=8192
 
 # etc settings
 max_connections = 1024
