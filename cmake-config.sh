@@ -1,1 +1,0 @@
-cmake -DWITH_DEBUG=OFF -DWITH_UNIT_TESTS=OFF -B build
