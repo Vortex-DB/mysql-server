@@ -48,36 +48,29 @@ innodb_page_size=4KB
 # * InnoDB
 #
 
+
 #file per table ON
-innodb_use_nvme_hint=false
 innodb_file_per_table=1
 
 #buffer settings
-innodb_buffer_pool_size=1G
-innodb_buffer_pool_instances=8
-innodb_max_dirty_pages_pct_lwm=0
 
 #etc
 log_error_verbosity=3
-innodb_page_cleaners=8
 
 #transaction log settings
-innodb_log_file_size=3G
-innodb_log_files_in_group=3
+innodb_redo_log_capacity=2147483648
 
 # 0:every 1 seconds, 1:fsync on commits, 2:writes on commits
 innodb_flush_log_at_trx_commit=0
-innodb_log_buffer_size=32M
+innodb_log_buffer_size=16M
 innodb_flush_neighbors=0
 
 #doublewrite and flush method
-innodb_doublewrite=ON
 innodb_flush_method=O_DIRECT
 
 #AIO control
 innodb_use_native_aio=true
 innodb_change_buffering=none
-innodb_lru_scan_depth=8192
 
 # etc settings
 max_connections = 1024
@@ -95,4 +88,25 @@ innodb_io_capacity_max = 200000
 #innodb_status_output = ON
 #innodb_status_output_locks = ON
 
+# io burst
+innodb_lru_scan_depth=16384
+innodb_page_cleaners=8
+innodb_doublewrite=ON
+innodb_doublewrite_files=4
+innodb_doublewrite_pages=512
+skip_log_bin
+slow_query_log                  = OFF
+sync_binlog                   = 0
+innodb_flush_sync=OFF
+innodb_adaptive_flushing        = 0
+innodb_max_dirty_pages_pct       = 90
+innodb_max_dirty_pages_pct_lwm   = 0
+innodb_adaptive_hash_index      = OFF
+performance_schema              = OFF
+innodb_old_blocks_time=0
+innodb_buffer_pool_size=1G
+innodb_buffer_pool_instances=8
 
+# CPR options
+innodb_use_nvme_hint=true
+innodb_cpr_write_period=10000

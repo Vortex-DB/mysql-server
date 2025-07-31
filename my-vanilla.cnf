@@ -21,23 +21,25 @@ socket          = /tmp/mysql.sock
 #
 # * Basic Settings
 #
+
 user=root
 bind-address=*
 port            = 3306
 default-storage-engine = innodb
 #skip-grant-tables
-pid-file        = /home/wurikiji/backup/db/mysql.pid
+pid-file        = /home/wurikiji/nvme/db/mysql.pid
 socket          = /tmp/mysql.sock
-datadir         = /home/wurikiji/backup/db
+datadir         = /home/wurikiji/nvme/db
 log-error	= /home/wurikiji/logs/mysqld_errors.log
 disable_log_bin
 character_set_server=latin1
 collation_server=latin1_bin
+max_allowed_packet=256M
 ##################################################
 # Need to Modify
 ##################################################
 #Log group path (iblog0, iblog1)
-innodb_log_group_home_dir=/home/wurikiji/backup/log
+innodb_log_group_home_dir=/home/wurikiji/ssd/log
 
 #innodb page size
 innodb_page_size=4KB
@@ -46,45 +48,39 @@ innodb_page_size=4KB
 # * InnoDB
 #
 
+
 #file per table ON
-innodb_use_nvme_hint=false
 innodb_file_per_table=1
 
 #buffer settings
-innodb_buffer_pool_size=10G
-innodb_buffer_pool_instances=8
-innodb_max_dirty_pages_pct_lwm=0
 
 #etc
 log_error_verbosity=3
-innodb_page_cleaners=8
 
 #transaction log settings
-innodb_redo_log_capacity=9663676416
+innodb_redo_log_capacity=2147483648
 
 # 0:every 1 seconds, 1:fsync on commits, 2:writes on commits
 innodb_flush_log_at_trx_commit=0
-innodb_log_buffer_size=64M
+innodb_log_buffer_size=32M
 innodb_flush_neighbors=0
 
 #doublewrite and flush method
-innodb_doublewrite=OFF
 innodb_flush_method=O_DIRECT
 
 #AIO control
 innodb_use_native_aio=true
 innodb_change_buffering=none
-innodb_lru_scan_depth=1024
 
 # etc settings
 max_connections = 1024
 open_files_limit = 24000
 
 # io settings
-#innodb_io_capacity = 10000
-#innodb_io_capacity_max = 20000
-#innodb_write_io_threads = 32
-#innodb_read_io_threads = 32
+innodb_io_capacity = 100000
+innodb_io_capacity_max = 200000
+innodb_write_io_threads = 16
+innodb_read_io_threads = 16
 
 # monitoring settings
 #performance-schema-instrument='wait/synch/mutex/innodb/%=ON'
@@ -92,3 +88,25 @@ open_files_limit = 24000
 #innodb_status_output = ON
 #innodb_status_output_locks = ON
 
+# io burst
+innodb_lru_scan_depth=16384
+innodb_page_cleaners=8
+innodb_doublewrite=ON
+innodb_doublewrite_files=4
+innodb_doublewrite_pages=512
+skip_log_bin
+slow_query_log                  = OFF
+sync_binlog                   = 0
+innodb_flush_sync=OFF
+innodb_adaptive_flushing        = 0
+innodb_max_dirty_pages_pct       = 20
+innodb_max_dirty_pages_pct_lwm   = 0
+innodb_adaptive_hash_index      = OFF
+performance_schema              = OFF
+innodb_old_blocks_time=0
+innodb_buffer_pool_size=1G
+innodb_buffer_pool_instances=8
+
+# CPR options
+innodb_use_nvme_hint=false
+innodb_cpr_write_period=10000
